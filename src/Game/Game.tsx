@@ -149,6 +149,9 @@ export default function Game() {
             <div className="bab__hint-title">{t('title')}</div>
             <div className="bab__hint-sub">{t('tagline')}</div>
             <div className="bab__hint-cta">{t('hint')}</div>
+            {canRank && (
+              <button className="bab__hint-lb" onClick={(e) => { e.stopPropagation(); setShowLeaderboard(true); }}>{t('leaderboard')}</button>
+            )}
           </div>
         )}
 
