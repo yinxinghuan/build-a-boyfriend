@@ -1,0 +1,23 @@
+# deps
+node_modules/
+
+# build
+dist/
+*.tsbuildinfo
+
+# logs
+*.log
+npm-debug.log*
+
+# os
+.DS_Store
+
+# editors
+.idea/
+.vscode/
+
+# generation artifacts (kept locally for re-runs; not for repo)
+_frames/
+_videos/
+candidates/
+*.candidates/
