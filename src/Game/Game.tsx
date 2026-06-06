@@ -3,6 +3,7 @@ import { BoyfriendGame, WORLD_W, WORLD_H } from './engine';
 import { TIERS } from './tiers';
 import { unlock } from './audio';
 import { t, tierName } from './i18n';
+import { useGameScore, Leaderboard } from '@shared/leaderboard';
 import './Game.less';
 
 interface Popup { id: number; x: number; y: number; tier: number; name: string; quip: string; pts: number; kind: 'merge' | 'final'; }
@@ -25,13 +26,15 @@ export default function Game() {
   const [started, setStarted] = useState(false);
   const [over, setOver] = useState(false);
   const [popups, setPopups] = useState<Popup[]>([]);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const { isInAigram, canRank, submitScore, fetchLeaderboard } = useGameScore();
 
   const spawnPopup = useCallback((pts: number, x: number, y: number, tier: number, kind: 'merge' | 'final') => {
     const td = TIERS[tier];
     const id = popupId.current++;
     const p: Popup = { id, x, y, tier, pts, kind, name: tierName(td.nameZh, td.nameEn), quip: tierName(td.quipZh, td.quipEn) };
     setPopups(prev => [...prev, p]);
-    setTimeout(() => setPopups(prev => prev.filter(q => q.id !== id)), 1100);
+    setTimeout(() => setPopups(prev => prev.filter(q => q.id !== id)), kind === 'final' ? 1500 : 2000);
   }, []);
 
   const makeGame = useCallback((canvas: HTMLCanvasElement) => new BoyfriendGame(canvas, {
@@ -51,6 +54,11 @@ export default function Game() {
     window.addEventListener('resize', onResize);
     return () => { window.removeEventListener('resize', onResize); game.destroy(); };
   }, [makeGame]);
+
+  // submit final score to the platform leaderboard once per game over
+  useEffect(() => {
+    if (over && score > 0) submitScore(score).catch(() => { /* silent */ });
+  }, [over]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // persist best
   useEffect(() => {
@@ -152,8 +160,20 @@ export default function Game() {
               <div className="bab__over-score">{pad(score)}</div>
               <div className="bab__over-best">{t('best')} {pad(best)}</div>
               <button className="bab__retry" onClick={restart}>{t('retry')}</button>
+              {canRank && (
+                <button className="bab__lb-btn" onClick={() => setShowLeaderboard(true)}>{t('leaderboard')}</button>
+              )}
             </div>
           </div>
+        )}
+
+        {showLeaderboard && (
+          <Leaderboard
+            gameName={t('title')}
+            isInAigram={isInAigram}
+            onClose={() => setShowLeaderboard(false)}
+            fetch={fetchLeaderboard}
+          />
         )}
       </div>
 

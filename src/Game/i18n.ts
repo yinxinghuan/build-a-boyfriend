@@ -17,6 +17,7 @@ const STR = {
   goSub:     { zh: '渣男堆到顶了',     en: 'the pile hit the ceiling' },
   retry:     { zh: '再养一个',        en: 'RAISE ANOTHER' },
   win:       { zh: '巨婴养成！',       en: 'MAN-BABY RAISED!' },
+  leaderboard: { zh: '排行榜',         en: 'LEADERBOARD' },
 } as const;
 
 const locale = detectLocale();
