@@ -68,7 +68,17 @@ def find_neck(widths: np.ndarray) -> int | None:
     # the jaw/chin taper and clip the chin. Keeping a tiny neck stub is fine: the
     # white sticker border wraps it so it still reads as a clean head.
     band = np.where(seg <= neck_w * 1.18)[0]
-    return min_row + int(band[-1])
+    cut = min_row + int(band[-1])
+    # Chin guard: if the cut still lands on a wide row (≈ jaw/chin, not a thin
+    # neck — e.g. an open-mouth face whose chin sits right on the shoulders), the
+    # head has no real neck. Slide the cut DOWN to just before the shoulders truly
+    # flare so the whole chin survives — a sliver of shoulder under the border
+    # reads better than a sheared-off jaw.
+    if widths[cut] > 0.70 * head_max:
+        flare = np.where(widths[cut:sh_row + 1] > 1.05 * head_max)[0]
+        if len(flare):
+            cut = cut + int(flare[0])
+    return cut
 
 
 def extent(sil: np.ndarray) -> np.ndarray:
