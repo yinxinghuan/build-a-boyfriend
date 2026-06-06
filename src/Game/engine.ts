@@ -43,10 +43,13 @@ const FACES: Face[] = [
 
 export interface GameCallbacks {
   onScore: (total: number) => void;
-  onPopup: (text: string, x: number, y: number, tier: number) => void;
+  onPopup: (pts: number, x: number, y: number, tier: number, kind: 'merge' | 'final') => void;
   onGameOver: () => void;
   onTurn: (current: number, next: number) => void;
+  onMaxTier: (maxTier: number) => void;
 }
+
+interface Flash { x: number; y: number; r0: number; r1: number; life: number; max: number; color: string; }
 
 export class BoyfriendGame {
   private engine: Matter.Engine;
@@ -56,7 +59,10 @@ export class BoyfriendGame {
   private raf = 0;
   private images: (HTMLImageElement | null)[] = [];
   private particles: Particle[] = [];
+  private flashes: Flash[] = [];
   private mergeQueue: { a: BFBody; b: BFBody }[] = [];
+  private maxTier = 0;
+  private shakeMag = 0;
 
   private aimX = WORLD_W / 2;
   private currentTier = nextSpawnTier();
@@ -139,14 +145,15 @@ export class BoyfriendGame {
     if (!this.started || this.gameOver || !this.canDrop) return;
     const tier = TIERS[this.currentTier];
     const body = Matter.Bodies.circle(this.aimX, DROP_Y, tier.radius, {
-      restitution: 0.05,
-      friction: 0.55,
-      frictionStatic: 0.7,
+      restitution: 0.22,
+      friction: 0.4,
+      frictionStatic: 0.6,
       density: 0.0014,
       slop: 0.02,
     }) as BFBody;
     body.plugin = { isBf: true, tier: this.currentTier, merged: false, bornAt: performance.now() };
     Matter.Composite.add(this.world, body);
+    Matter.Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.12);
     playDrop();
     this.currentTier = this.nextTier;
     this.nextTier = nextSpawnTier();
@@ -169,31 +176,48 @@ export class BoyfriendGame {
 
       if (tier >= FINAL_TIER) {
         // two man-babies cancel out — big clear
-        this.addScore(MERGE_POINTS[FINAL_TIER] * 2, mx, my, FINAL_TIER, true);
+        this.flash(mx, my, TIERS[FINAL_TIER].radius, TIERS[FINAL_TIER].ring);
+        this.shake(7);
+        this.addScore(MERGE_POINTS[FINAL_TIER] * 2, mx, my, FINAL_TIER, 'final');
         playFinal();
         continue;
       }
       const newTier = tier + 1;
       const nb = Matter.Bodies.circle(mx, my, TIERS[newTier].radius, {
-        restitution: 0.08,
-        friction: 0.55,
-        frictionStatic: 0.7,
+        restitution: 0.22,
+        friction: 0.4,
+        frictionStatic: 0.6,
         density: 0.0014,
         slop: 0.02,
       }) as BFBody;
       nb.plugin = { isBf: true, tier: newTier, merged: false, bornAt: performance.now() };
       Matter.Composite.add(this.world, nb);
-      Matter.Body.setVelocity(nb, { x: 0, y: -2.2 });
-      this.addScore(MERGE_POINTS[newTier], mx, my, newTier, newTier === FINAL_TIER);
+      Matter.Body.setVelocity(nb, { x: 0, y: -2.6 });
+      Matter.Body.setAngularVelocity(nb, (Math.random() - 0.5) * 0.3);
+      this.flash(mx, my, TIERS[newTier].radius, TIERS[newTier].ring);
+      this.shake(newTier === FINAL_TIER ? 7 : Math.min(6, 2 + newTier * 0.5));
+      this.bumpMaxTier(newTier);
+      this.addScore(MERGE_POINTS[newTier], mx, my, newTier, newTier === FINAL_TIER ? 'final' : 'merge');
       if (newTier === FINAL_TIER) playFinal(); else playMerge(newTier);
     }
   }
 
-  private addScore(pts: number, x: number, y: number, tier: number, big = false) {
+  private bumpMaxTier(tier: number) {
+    if (tier > this.maxTier) { this.maxTier = tier; this.cb.onMaxTier(this.maxTier); }
+  }
+
+  private flash(x: number, y: number, r: number, color: string) {
+    this.flashes.push({ x, y, r0: r * 0.6, r1: r * 1.9, life: 0, max: 22, color });
+  }
+
+  private shake(mag: number) {
+    this.shakeMag = Math.max(this.shakeMag, mag);
+  }
+
+  private addScore(pts: number, x: number, y: number, tier: number, kind: 'merge' | 'final') {
     this.score += pts;
     this.cb.onScore(this.score);
-    const tierDef = TIERS[tier];
-    this.cb.onPopup(big ? tierDef.nameZh : `+${pts}`, x, y, tier);
+    this.cb.onPopup(pts, x, y, tier, kind);
   }
 
   private burst(x: number, y: number, color: string, tier: number) {
@@ -252,6 +276,9 @@ export class BoyfriendGame {
     for (const p of this.particles) {
       p.x += p.vx; p.y += p.vy; p.vy += 0.18; p.vx *= 0.98; p.life++;
     }
+    this.flashes = this.flashes.filter(f => f.life < f.max);
+    for (const f of this.flashes) f.life++;
+    if (this.shakeMag > 0.1) this.shakeMag *= 0.84; else this.shakeMag = 0;
   }
 
   // ---- rendering ----
@@ -262,36 +289,36 @@ export class BoyfriendGame {
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
-  private drawGuy(b: { x: number; y: number; r: number; tier: number }) {
+  private drawGuy(b: { x: number; y: number; r: number; tier: number; born?: number; angle?: number }) {
     const ctx = this.ctx;
     const tierDef = TIERS[b.tier];
     const img = this.images[b.tier];
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
-    ctx.closePath();
-    // soft glow
-    ctx.shadowColor = tierDef.ring;
-    ctx.shadowBlur = 10;
-    ctx.fillStyle = tierDef.color;
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.clip();
-    if (img && img.complete && img.naturalWidth) {
-      const d = b.r * 2;
-      ctx.drawImage(img, b.x - b.r, b.y - b.r, d, d);
-    } else {
-      this.drawFallbackFace(b.x, b.y, b.r, b.tier);
+    const x = b.x, y = b.y, ang = b.angle ?? 0;
+    // birth pop: overshoot scale that settles in ~220ms
+    let r = b.r;
+    if (b.born != null) {
+      const age = performance.now() - b.born;
+      if (age < 220) {
+        const k = age / 220;
+        r = b.r * (1 + 0.24 * Math.sin(k * Math.PI) * (1 - k * 0.4));
+      }
     }
-    ctx.restore();
-    // ring
-    ctx.beginPath();
-    ctx.arc(b.x, b.y, b.r - 1, 0, Math.PI * 2);
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = tierDef.ring;
-    ctx.globalAlpha = 0.85;
-    ctx.stroke();
-    ctx.globalAlpha = 1;
+
+    void tierDef;
+    if (img && img.complete && img.naturalWidth) {
+      const box = r * 2 * 1.2;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(ang);
+      // soft contact shadow — the white die-cut border carries the "sticker" pop
+      ctx.shadowColor = '#00000026';
+      ctx.shadowBlur = 6;
+      ctx.shadowOffsetY = 3;
+      ctx.drawImage(img, -box / 2, -box / 2, box, box);
+      ctx.restore();
+    } else {
+      this.drawFallbackFace(x, y, r, b.tier);
+    }
   }
 
   private drawFallbackFace(x: number, y: number, r: number, tier: number) {
@@ -497,20 +524,38 @@ export class BoyfriendGame {
     const ctx = this.ctx;
     ctx.clearRect(0, 0, WORLD_W, WORLD_H);
 
-    // jar interior bg
-    ctx.fillStyle = '#2a1426';
+    ctx.save();
+    if (this.shakeMag > 0) {
+      ctx.translate((Math.random() * 2 - 1) * this.shakeMag, (Math.random() * 2 - 1) * this.shakeMag);
+    }
+
+    // minimalist play area — soft off-white panel, faint inner shading
+    ctx.fillStyle = '#ffffff';
     ctx.fillRect(WALL, 0, WORLD_W - WALL * 2, WORLD_H - WALL);
-    // walls
-    ctx.fillStyle = '#48203f';
+    const jg = ctx.createLinearGradient(0, 0, 0, WORLD_H);
+    jg.addColorStop(0, '#00000000');
+    jg.addColorStop(1, '#1a12260c');
+    ctx.fillStyle = jg;
+    ctx.fillRect(WALL, 0, WORLD_W - WALL * 2, WORLD_H - WALL);
+
+    // walls — same warm paper as the page, with one thin neutral inner outline
+    ctx.fillStyle = '#f3efe9';
     ctx.fillRect(0, 0, WALL, WORLD_H);
     ctx.fillRect(WORLD_W - WALL, 0, WALL, WORLD_H);
     ctx.fillRect(0, WORLD_H - WALL, WORLD_W, WALL);
-
-    // kill line
-    ctx.save();
-    ctx.strokeStyle = this.overSince ? '#ff5a7a' : '#ffffff55';
+    ctx.strokeStyle = '#0000000f';
     ctx.lineWidth = 1.5;
-    ctx.setLineDash([6, 6]);
+    ctx.beginPath();
+    ctx.moveTo(WALL, 0); ctx.lineTo(WALL, WORLD_H - WALL);
+    ctx.lineTo(WORLD_W - WALL, WORLD_H - WALL);
+    ctx.lineTo(WORLD_W - WALL, 0);
+    ctx.stroke();
+
+    // kill line — thin understated dashed
+    ctx.save();
+    ctx.strokeStyle = this.overSince ? '#ff5a7a' : '#0000001f';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([5, 7]);
     ctx.beginPath();
     ctx.moveTo(WALL, KILL_Y);
     ctx.lineTo(WORLD_W - WALL, KILL_Y);
@@ -519,9 +564,21 @@ export class BoyfriendGame {
 
     // bodies
     for (const b of this.bfBodies()) {
-      this.drawGuy({ x: b.position.x, y: b.position.y, r: b.circleRadius!, tier: b.plugin.tier });
-      // rotate marker not needed; circles
+      this.drawGuy({ x: b.position.x, y: b.position.y, r: b.circleRadius!, tier: b.plugin.tier, born: b.plugin.bornAt, angle: b.angle });
     }
+
+    // merge flashes — expanding fading ring
+    for (const f of this.flashes) {
+      const k = f.life / f.max;
+      const rr = f.r0 + (f.r1 - f.r0) * k;
+      ctx.globalAlpha = (1 - k) * 0.7;
+      ctx.strokeStyle = f.color;
+      ctx.lineWidth = 3 * (1 - k) + 1;
+      ctx.beginPath();
+      ctx.arc(f.x, f.y, rr, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
 
     // particles
     for (const p of this.particles) {
@@ -538,7 +595,7 @@ export class BoyfriendGame {
       const tierDef = TIERS[this.currentTier];
       // drop guide
       ctx.save();
-      ctx.strokeStyle = '#ffffff22';
+      ctx.strokeStyle = '#00000016';
       ctx.lineWidth = 1;
       ctx.setLineDash([4, 8]);
       ctx.beginPath();
@@ -548,6 +605,8 @@ export class BoyfriendGame {
       ctx.restore();
       this.drawGuy({ x: this.aimX, y: DROP_Y, r: tierDef.radius, tier: this.currentTier });
     }
+
+    ctx.restore();
   }
 
   destroy() {

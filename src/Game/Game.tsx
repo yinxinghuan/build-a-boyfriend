@@ -5,9 +5,12 @@ import { unlock } from './audio';
 import { t, tierName } from './i18n';
 import './Game.less';
 
-interface Popup { id: number; text: string; x: number; y: number; tier: number; }
+interface Popup { id: number; x: number; y: number; tier: number; name: string; quip: string; pts: number; kind: 'merge' | 'final'; }
 
 const BEST_KEY = 'build_a_boyfriend_best';
+const BASE = (import.meta as any).env?.BASE_URL ?? '/';
+const tierImg = (idx: number) => `${BASE}tiers/tier${idx}.png`;
+const pad = (n: number) => String(Math.max(0, n)).padStart(5, '0');
 
 export default function Game() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -18,30 +21,36 @@ export default function Game() {
   const [score, setScore] = useState(0);
   const [best, setBest] = useState(() => parseInt(localStorage.getItem(BEST_KEY) ?? '0', 10));
   const [nextTier, setNextTier] = useState(0);
+  const [maxTier, setMaxTier] = useState(0);
   const [started, setStarted] = useState(false);
   const [over, setOver] = useState(false);
   const [popups, setPopups] = useState<Popup[]>([]);
 
-  const spawnPopup = useCallback((text: string, x: number, y: number, tier: number) => {
+  const spawnPopup = useCallback((pts: number, x: number, y: number, tier: number, kind: 'merge' | 'final') => {
+    const td = TIERS[tier];
     const id = popupId.current++;
-    setPopups(p => [...p, { id, text, x, y, tier }]);
-    setTimeout(() => setPopups(p => p.filter(q => q.id !== id)), 900);
+    const p: Popup = { id, x, y, tier, pts, kind, name: tierName(td.nameZh, td.nameEn), quip: tierName(td.quipZh, td.quipEn) };
+    setPopups(prev => [...prev, p]);
+    setTimeout(() => setPopups(prev => prev.filter(q => q.id !== id)), 1100);
   }, []);
+
+  const makeGame = useCallback((canvas: HTMLCanvasElement) => new BoyfriendGame(canvas, {
+    onScore: setScore,
+    onPopup: spawnPopup,
+    onGameOver: () => setOver(true),
+    onTurn: (_cur, next) => setNextTier(next),
+    onMaxTier: setMaxTier,
+  }), [spawnPopup]);
 
   useEffect(() => {
     const canvas = canvasRef.current!;
-    const game = new BoyfriendGame(canvas, {
-      onScore: setScore,
-      onPopup: spawnPopup,
-      onGameOver: () => setOver(true),
-      onTurn: (_cur, next) => setNextTier(next),
-    });
+    const game = makeGame(canvas);
     gameRef.current = game;
     setNextTier(game.getNextTier());
     const onResize = () => game.resize();
     window.addEventListener('resize', onResize);
     return () => { window.removeEventListener('resize', onResize); game.destroy(); };
-  }, [spawnPopup]);
+  }, [makeGame]);
 
   // persist best
   useEffect(() => {
@@ -77,15 +86,9 @@ export default function Game() {
 
   const restart = () => {
     gameRef.current?.destroy();
-    const canvas = canvasRef.current!;
-    const game = new BoyfriendGame(canvas, {
-      onScore: setScore,
-      onPopup: spawnPopup,
-      onGameOver: () => setOver(true),
-      onTurn: (_cur, next) => setNextTier(next),
-    });
+    const game = makeGame(canvasRef.current!);
     gameRef.current = game;
-    setScore(0); setOver(false); setStarted(true);
+    setScore(0); setOver(false); setStarted(true); setMaxTier(0);
     setNextTier(game.getNextTier());
     unlock(); game.start();
   };
@@ -94,20 +97,18 @@ export default function Game() {
 
   return (
     <div className="bab">
-      <div className="bab__top">
-        <div className="bab__scores">
-          <div className="bab__scoreblock">
-            <span className="bab__label">{t('score')}</span>
-            <span className="bab__score">{score}</span>
-          </div>
-          <div className="bab__scoreblock bab__scoreblock--best">
-            <span className="bab__label">{t('best')}</span>
-            <span className="bab__best">{best}</span>
-          </div>
+      <div className="bab__hud">
+        <div className="bab__panel bab__panel--score">
+          <span className="bab__plabel">SCORE</span>
+          <span className="bab__num">{pad(score)}</span>
         </div>
-        <div className="bab__next">
-          <span className="bab__label">{t('next')}</span>
-          <span className="bab__nextdot" style={{ background: nt.color, boxShadow: `0 0 8px ${nt.ring}` }} />
+        <div className="bab__panel bab__panel--hi">
+          <span className="bab__plabel">HI</span>
+          <span className="bab__num">{pad(best)}</span>
+        </div>
+        <div className="bab__panel bab__panel--next">
+          <span className="bab__plabel">NEXT</span>
+          <span className="bab__nextimg"><img src={tierImg(nextTier)} alt="" draggable={false} /></span>
           <span className="bab__nextname">{tierName(nt.nameZh, nt.nameEn)}</span>
         </div>
       </div>
@@ -126,10 +127,12 @@ export default function Game() {
         {popups.map(p => (
           <div
             key={p.id}
-            className="bab__popup"
-            style={{ left: `${(p.x / WORLD_W) * 100}%`, top: `${(p.y / WORLD_H) * 100}%`, color: TIERS[p.tier].ring }}
+            className={`bab__popup ${p.kind === 'final' ? 'bab__popup--final' : ''}`}
+            style={{ left: `${(p.x / WORLD_W) * 100}%`, top: `${(p.y / WORLD_H) * 100}%` }}
           >
-            {p.text}
+            <span className="bab__pop-name" style={{ color: TIERS[p.tier].ring }}>{p.name}</span>
+            <span className="bab__pop-quip">{p.quip}</span>
+            <span className="bab__pop-pts">+{p.pts}</span>
           </div>
         ))}
 
@@ -144,14 +147,26 @@ export default function Game() {
         {over && (
           <div className="bab__over" onPointerDown={(e) => e.stopPropagation()}>
             <div className="bab__over-card">
-              <div className="bab__over-title">{t('gameover')}</div>
+              <div className="bab__over-title">{maxTier >= TIERS.length - 1 ? t('win') : t('gameover')}</div>
               <div className="bab__over-sub">{t('goSub')}</div>
-              <div className="bab__over-score">{score}</div>
-              <div className="bab__over-best">{t('best')} {best}</div>
+              <div className="bab__over-score">{pad(score)}</div>
+              <div className="bab__over-best">{t('best')} {pad(best)}</div>
               <button className="bab__retry" onClick={restart}>{t('retry')}</button>
             </div>
           </div>
         )}
+      </div>
+
+      <div className="bab__chain">
+        {TIERS.map(td => {
+          const on = td.idx <= maxTier;
+          const target = td.idx === maxTier + 1;
+          return (
+            <div key={td.idx} className={`bab__chip${on ? ' is-on' : ''}${target ? ' is-target' : ''}`}>
+              <img src={tierImg(td.idx)} alt="" draggable={false} />
+            </div>
+          );
+        })}
       </div>
     </div>
   );

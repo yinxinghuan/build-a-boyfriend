@@ -20,45 +20,72 @@ HEADERS = {
 TIMEOUT = int(os.environ.get("GEN_TIMEOUT", "360"))
 OUT_DIR = os.path.join(os.path.dirname(__file__), "public", "tiers")
 
-STYLE = ("chibi cartoon boyfriend mascot, one single character, huge round head small body, "
-         "centered portrait, FULL BLEED square composition filling the entire frame edge to edge, "
-         "no border no frame no padding, soft painterly cel shading, thick clean dark outlines, "
-         "glossy highlights, vibrant deep magenta hot-pink and purple background gradient, "
-         "cute mobile merge-game character art, expressive comedic face, no text, no watermark")
+# Bold-outline flat sticker HEADS on a flat background — these get color-keyed into
+# floating head cutouts + a white die-cut border in post, so the art must be HEAD ONLY
+# (no neck, no shoulders, no body) with a thick clean outline. Archetype must read from
+# the FACE / hair / head-level accessory. Head fills the frame, centered.
+STYLE = ("a single die-cut STICKER of ONE man's HEAD, bold thick clean black ink outline, flat "
+         "cel-shaded solid color fills, simple chunky cartoon shapes, playful comedic caricature, "
+         "a clean white sticker border hugging the silhouette. "
+         "CRITICAL: draw ONLY the head and hair — the sticker silhouette follows the outline of "
+         "the HEAD AND HAIR and ENDS AT THE JAW AND CHIN, like a single emoji head. "
+         "NO neck, NO neck stub, NO shoulders, NO shirt, NO collar, NO chest, NO body of any kind. "
+         "Big expressive head, facing camera, exaggerated comedic facial expression, head "
+         "centered, FLAT SOLID UNIFORM MEDIUM GREY background, no gradient, no texture, no "
+         "scenery, no drop shadow, no text, no watermark, no logo")
 
 TIERS = [
-    "a tiny meek shy young man holding a phone showing a glowing heart like-button, "
-    "timid half-smile, barely-there boyfriend, very small and unassuming",
+    # 0 点赞之交 — likes-only acquaintance
+    "a meek forgettable plain everyman face, shy awkward closed-lip half-smile, hopeful "
+    "nervous wide eyes, soft unremarkable boy-next-door features, totally harmless and timid",
 
-    "a young man in a dark hoodie lit blue by his phone screen in the dark, droopy half-lidded "
-    "sleepy eyes, sly late-night smirk, typing a 3am text",
+    # 1 半夜「在吗」 — 3am 'u up?'
+    "a scruffy young man with light stubble and messy bed hair, heavy half-lidded sleepy "
+    "bedroom eyes, sly knowing late-night smirk, one eyebrow cocked, face faintly lit cold "
+    "blue from below by an off-screen phone glow",
 
-    "a beefy gym bro in a tight tank top holding a protein shaker bottle, flexing one bicep, "
-    "salesman grin, sweatband, pushing his coaching plan",
+    # 2 健身房推销男 — gym salesman bro
+    "a smug overtanned gym-bro face wearing a sporty terry headband, cocky open-mouth "
+    "salesman grin showing too-white teeth, veiny temple, raised eyebrows, vain and way too "
+    "pleased with himself",
 
-    "a hopeful sad-puppy-eyed young man sitting waiting on a bench holding a slightly wilting "
-    "bouquet of flowers, second-choice backup boyfriend, gentle pathetic smile",
+    # 3 备胎 — the backup / spare
+    "a hopeful sad puppy-dog-eyed young man, big pleading watery eyes, eager 'pick me' "
+    "lopsided half-smile, slightly slumped, soft eager-to-please pathetic expression",
 
-    "a noncommittal young man giving an ambiguous shrug, one eyebrow raised, half turned away, "
-    "a floating question mark over his head, undefined situationship vibe",
+    # 4 暧昧对象 — situationship
+    "a noncommittal smirking young man, one eyebrow raised, evasive sideways side-eye glance, "
+    "sly 'we're not labeling it' lopsided smirk, head slightly tilted away, a small floating "
+    "question mark beside his head",
 
-    "a young man's face shown inside a glowing webcam video-call window with little heart "
-    "emojis floating, pixelated screen glow, long-distance online boyfriend, never met in person",
+    # 5 网恋男友 — online-only boyfriend
+    "a young man's head with faint pixelated digital screen-glow grain on his skin and a couple "
+    "of glitchy horizontal scanline artifacts across his face, puckered lips blowing an "
+    "exaggerated kiss at the camera, a small floating red webcam REC dot beside his head, "
+    "never-met-in-person online boyfriend",
 
-    "a clean-cut confident young man in a casual couple outfit holding a coffee cup, "
-    "warm proud official-boyfriend smile, tidy hair, wholesome",
+    # 6 正牌男友 — the actual official boyfriend
+    "a clean-cut genuinely handsome confident young man, warm proud sincere wholesome smile, "
+    "tidy neatly groomed hair, clear bright trustworthy eyes, the rare decent good one",
 
-    "a lazy slob roommate slouched on a couch in a stained tank top, game controller in hand, "
-    "messy socks and clutter around him, unbothered grin",
+    # 7 同居室友 — live-in slob roommate
+    "an unshaven lazy slob with greasy unkempt messy bed hair and a faint double chin, "
+    "dead-eyed unbothered lazy half-grin, slack checked-out expression, never-does-the-dishes "
+    "roommate energy",
 
-    "a smug young man kneeling on one knee holding open a ring box, a credit card peeking from "
-    "the box, slick overconfident grin, cheap engagement",
+    # 8 未婚夫 — the fiance
+    "a slick overconfident young man with shiny gelled-back hair, smug salesman wink, oily "
+    "too-pleased self-satisfied grin, raised cocky eyebrow, bargain-bin charm",
 
-    "a comfortable middle-aged husband with a round belly in an open bathrobe and socks, "
-    "TV remote in hand, wedding ring, contented oblivious slob smile",
+    # 9 老公 — the husband
+    "a comfortable balding middle-aged husband with a round face, stubbled double chin, "
+    "receding hairline, contented oblivious checked-out droopy-eyed smile, completely let "
+    "himself go",
 
-    "a giant absurd man-baby: a grown man's smug face wearing a baby bonnet and pacifier and "
-    "diaper, oversized chubby body, final-boss colossal man-baby, pink, throwing a tantrum",
+    # 10 巨婴老公 — the man-baby final boss
+    "an absurd grown man with a fully adult stubbled face wearing a frilly white baby bonnet "
+    "and sucking an oversized blue pacifier in his mouth, chubby cheeks puffed up, furious "
+    "scrunched-up crying tantrum eyes, ridiculous colossal final-boss man-baby meltdown",
 ]
 
 

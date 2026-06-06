@@ -21,3 +21,5 @@ _frames/
 _videos/
 candidates/
 *.candidates/
+__pycache__/
+public/tiers/_raw/
